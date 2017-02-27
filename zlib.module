@@ -1,0 +1,14 @@
+;;; -*- lisp -*- ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Description
+;;; Author         Michael Kappert
+;;; Created        22/03/2000 11:15:16
+;;; Last Modified  <michael 2015-02-04 00:06:34>
+
+(dm:defmodule "zlib"
+    :source-path "zlib/"
+    :source-ext "cl"
+    :components ((:serial
+                  (:file "zlib"))))
+
+;;; EOF
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
