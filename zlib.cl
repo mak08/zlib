@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    compress STRING to VECTOR, uncompress VECTOR to STRING
 ;;; Author         Michael Kappert 2015
-;;; Last Modified <michael 2017-02-27 20:53:37>
+;;; Last Modified <michael 2017-02-27 21:18:06>
 
 (defpackage "ZLIB"
   (:use "COMMON-LISP" "CFFI")
@@ -44,6 +44,8 @@
 
 ;; Compression level
 (defconstant +z_default_compression+ -1)
+(defconstant +Z_BEST_SPEED+           1)
+(defconstant +Z_BEST_COMPRESSION+     9)
 
 ;; Data_type
 (defconstant +Z_BINARY+   0)
