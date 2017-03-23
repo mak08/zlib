@@ -5,12 +5,12 @@ CFFI bindings for zlib
 
 1. Open zlib.cl and adapt the zlib path if necessary.
 
-	```
+```
 ...
 (define-foreign-library libz
   (:linux "/path/to/libz.so.1"))
 ...
-	```
+```
 2. Load with ASDF
 
 	```
