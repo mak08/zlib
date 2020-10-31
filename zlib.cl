@@ -1,13 +1,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    compress STRING to VECTOR, uncompress VECTOR to STRING
 ;;; Author         Michael Kappert 2015
-;;; Last Modified <michael 2017-02-27 21:18:06>
+;;; Last Modified <michael 2020-10-31 20:40:41>
 
 (defpackage "ZLIB"
   (:use "COMMON-LISP" "CFFI")
   (:export "GZIP"
+           "GZIP-BYTES"
            "GUNZIP"
            "COMPRESS"
+           "COMPRESS-BYTES"
            "UNCOMPRESS"
            "ZLIB-VERSION"))
 
@@ -134,12 +136,84 @@
     (setf (foreign-slot-value stream '(:struct z-stream-s) 'free-func) (null-pointer))
     (setf (foreign-slot-value stream '(:struct z-stream-s) 'opaque) (null-pointer))
     (assert (= (deflate-init2 stream :level level) +z_ok+))
+    (let* ((bytes (decode-string string))
+           (len-in (length bytes))
+           (len-out (deflate-bound stream len-in)))
+      (with-foreign-object
+          (buf-in :unsigned-char len-in)
+        (dotimes (i (length bytes))
+          (setf (mem-ref buf-in :unsigned-char i) (aref bytes i)))
+        (with-foreign-pointer
+            (buf-out len-out)
+          (setf (foreign-slot-value stream '(:struct z-stream-s) 'next-in) buf-in
+                (foreign-slot-value stream '(:struct z-stream-s) 'avail-in) len-in
+                (foreign-slot-value stream '(:struct z-stream-s) 'next-out) buf-out
+                (foreign-slot-value stream '(:struct z-stream-s) 'avail-out) len-out)
+          (assert (= (deflate stream +z_finish+) +z_stream_end+))
+          (let* ((out-len (foreign-slot-value stream '(:struct z-stream-s) 'total-out))
+                 (buffer (make-array out-len
+                                     :element-type '(unsigned-byte 8))))
+            (loop
+               :for i :below out-len
+               :do (setf (aref buffer i)
+                         (mem-ref buf-out :unsigned-char i)))
+            (deflate-end stream)
+            buffer))))))
+
+(defun decode-string (s)
+  (let ((result (make-array 1000 :fill-pointer 0 :adjustable t)))
+    (loop
+       :for c :across s
+       :do (loop
+              :for b :in (multiple-value-list (char-bytes c))
+              :do (vector-push-extend b result)))
+    result))
+  
+(defun char-bytes (char)
+  (let ((code (char-code char)))
+    (cond
+      ((< code #x80)
+       (values code))
+      ((< code #x800)
+       (values (dpb (ldb (byte 5 6) code) (byte 5 0) #b11000000)
+               (dpb (ldb (byte 6 0) code) (byte 6 0) #b10000000)))
+      ((< code #x10000)
+       (values (dpb (ldb (byte 4 12) code) (byte 4 0) #b11100000)
+               (dpb (ldb (byte 6 6) code) (byte 6 0) #b10000000)
+               (dpb (ldb (byte 6 0) code) (byte 6 0) #b10000000)))
+      ((< code #x200000)
+       (values (dpb (ldb (byte 3 18) code) (byte 3 0) #b11110000)
+               (dpb (ldb (byte 6 12) code) (byte 6 0) #b1000000)
+               (dpb (ldb (byte 6 6) code) (byte 6 08) #b10000000)
+               (dpb (ldb (byte 6 0) code) (byte 6 0) #b10000000)))
+      ((< code #x4000000)
+       (values (dpb (ldb (byte 2 24) code) (byte 2 0) #b11111000)
+               (dpb (ldb (byte 6 18) code) (byte 6 0) #b10000000)
+               (dpb (ldb (byte 6 12) code) (byte 6 0) #b1000000)
+               (dpb (ldb (byte 6 6) code) (byte 6 0) #b10000000)
+               (dpb (ldb (byte 6 0) code) (byte 6 0) #b10000000)))
+      ((< code #x80000000)
+       (values (dpb (ldb (byte 1 32) code) (byte 1 0) #b11111100)
+               (dpb (ldb (byte 6 24) code) (byte 6 0) #b10000000)
+               (dpb (ldb (byte 6 18) code) (byte 6 0) #b10000000)
+               (dpb (ldb (byte 6 12) code) (byte 6 0) #b1000000)
+               (dpb (ldb (byte 6 6) code) (byte 6 0) #b10000000)
+               (dpb (ldb (byte 6 0) code) (byte 6 0) #b10000000)))
+      (t
+       (error "Invalid UTF-8 code point ~d (~c)" code char)))))
+
+(defun gzip-bytes (string &key (level +z_default_compression+))
+  (with-foreign-object (stream '(:struct z-stream-s))
+    (setf (foreign-slot-value stream '(:struct z-stream-s) 'alloc-func) (null-pointer))
+    (setf (foreign-slot-value stream '(:struct z-stream-s) 'free-func) (null-pointer))
+    (setf (foreign-slot-value stream '(:struct z-stream-s) 'opaque) (null-pointer))
+    (assert (= (deflate-init2 stream :level level) +z_ok+))
     (let* ((len-in (length string))
            (len-out (deflate-bound stream len-in)))
       (with-foreign-object
           (buf-in :unsigned-char len-in)
         (dotimes (i (length string))
-          (setf (mem-ref buf-in :unsigned-char i) (char-code (aref string i))))
+          (setf (mem-ref buf-in :unsigned-char i) (aref string i)))
         (with-foreign-pointer
             (buf-out len-out)
           (setf (foreign-slot-value stream '(:struct z-stream-s) 'next-in) buf-in
