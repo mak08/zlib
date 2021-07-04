@@ -1,7 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Description    compress STRING to VECTOR, uncompress VECTOR to STRING
 ;;; Author         Michael Kappert 2015
-;;; Last Modified <michael 2021-02-14 15:57:40>
+;;; Last Modified <michael 2021-07-04 14:28:38>
 
 (defpackage "ZLIB"
   (:use "COMMON-LISP" "CFFI")
@@ -16,7 +16,7 @@
 (in-package zlib)
 
 (define-foreign-library libz
-  (:linux "/usr/lib64/libz.so.1"))
+  (:linux  #.(macros:get-library "libz.so")))
 
 (use-foreign-library libz)
 
