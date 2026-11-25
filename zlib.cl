@@ -11,7 +11,11 @@
            "COMPRESS"
            "COMPRESS-BYTES"
            "UNCOMPRESS"
-           "ZLIB-VERSION"))
+           "ZLIB-VERSION"
+           "MAKE-DEFLATER" "MAKE-INFLATER" "DEFLATE-BYTES" "INFLATE-BYTES"
+           "RESET-CODEC" "CLOSE-CODEC" "WITH-CODEC" "CODEC-STATE" "CODEC-OUTPUT-COUNT"
+           "INFLATER-SYNC-POINT-P" "RESTART-INFLATER"
+           "ZLIB-ERROR" "ZLIB-ERROR-CODE" "ZLIB-OUTPUT-LIMIT"))
 
 (in-package zlib)
 
@@ -24,6 +28,8 @@
 ;;; Constants
 
 ;; Flush mode
+(defconstant +z_no_flush+ 0)
+(defconstant +z_sync_flush+ 2)
 (defconstant +z_finish+ 4)
 
 ;; Return values
@@ -106,22 +112,15 @@
   (version :string)
   (stream_size :int))
 
-(defun deflate-init2 (stream &key (level +z_default_compression+) (strategy +z_default_strategy+) (format :gzip))
-  (let ((window-bits 15)
-        (mem-level 8)
-        (method +z_deflated+))
-    (ecase format
-      (:gzip
-       (incf window-bits 16)))
-    (with-foreign-string (version (zlib-version))
-      (deflate-init2% stream
-                      level
-                      method
-                      window-bits
-                      mem-level
-                      strategy
-                      version
-                      (foreign-type-size '(:struct z-stream-s))))))
+(defun deflate-init2 (stream &key (level +z_default_compression+)
+                                      (strategy +z_default_strategy+) (format :gzip)
+                                      (window-bits 15) (mem-level 8))
+  ;; zlib cannot provide an 8-bit raw compressor window. Reject it explicitly.
+  (check-type window-bits (integer 9 15))
+  (check-type mem-level (integer 1 9))
+  (deflate-init2% stream level +z_deflated+
+                  (ecase format (:raw (- window-bits)) (:zlib window-bits) (:gzip (+ 16 window-bits)))
+                  mem-level strategy (zlib-version) (foreign-type-size '(:struct z-stream-s))))
 
 (defcfun ("deflate" deflate) :int
   (stream :pointer)
@@ -241,13 +240,13 @@
   (version :string)
   (stream-size :int))
 
-(defun inflate-init2 (stream &key (format :gzip))
-  ;; use maximum window-bits to avoid z_data_errors
-  (let ((window-bits 15))
-    (ecase format
-      (:gzip
-       (incf window-bits 32)))
-    (inflate-init2% stream window-bits (zlib-version) (foreign-type-size '(:struct z-stream-s)))))
+(defun inflate-init2 (stream &key (format :gzip) (window-bits 15))
+  (check-type window-bits (integer 8 15))
+  (inflate-init2% stream
+                  (ecase format (:raw (- window-bits)) (:zlib window-bits)
+                    ;; Preserve legacy auto-detection of gzip and zlib wrappers.
+                    (:gzip (+ 32 window-bits)))
+                  (zlib-version) (foreign-type-size '(:struct z-stream-s))))
 
 (defcfun ("inflate" inflate)
     :int
